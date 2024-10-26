@@ -101,28 +101,20 @@ class AiidaLabHome:
         home = self._create_home_widget()
         display(home)
 
-        if self.is_demo_server:
-            display(ipw.HTML("<h1>Welcome to the AiiDAlab demo server</h1>"))
-            intro_content = ipw.HTML("""
-<p>
-    This is a demo server for AiiDAlab, a platform for computational science based on the AiiDA framework. The server is running on a virtual machine with limited resources and is intended for demonstration purposes only. The server is reset to its initial state every 24 hours. For more information on AiiDAlab, please visit the <a href="https://www.aiidalab.net" target="_blank">AiiDAlab website</a>.
-</p>
-<h4>Instructions:</h4>
-<ul>
-    <li>To <strong>launch the app</strong>, click the app logo</li>
-    <li>To manage the app, click on the "Manage App" button</li>
-    <li>To view the app's codebase, click on the "URL" button</li>
-</ul>
-            """)
-            intro = ipw.VBox([intro_content])
-            intro.add_class("intro-message")
-            display(intro)
+        self.apps_output = ipw.Output()
 
-        for name in self.load_apps():
-            # Create app widget if it has not been created yet.
-            if name not in self._app_widgets:
-                self._app_widgets[name] = self._create_app_widget(name)
-            display(self._app_widgets[name])
+        if self.is_demo_server:
+            demo_server_info = DemoServerInfoWidget()
+            self.apps_output = demo_server_info.apps
+
+        with self.apps_output:
+            for name in self.load_apps():
+                # Create app widget if it has not been created yet.
+                if name not in self._app_widgets:
+                    self._app_widgets[name] = self._create_app_widget(name)
+                display(self._app_widgets[name])
+
+        display(demo_server_info if self.is_demo_server else self.apps_output)
 
     def load_apps(self):
         """Load apps according to the order defined in the config file."""
@@ -221,3 +213,90 @@ class CollapsableAppWidget(ipw.Accordion):
     @traitlets.observe("hidden")
     def _observe_hidden(self, change):
         self.selected_index = None if change["new"] else 0
+
+
+class DemoServerInfoWidget(ipw.VBox):
+    """docstring"""
+
+    def __init__(self, **kwargs):
+        """docstring"""
+
+        self.pages = [
+            "About",
+            "Apps",
+            "Tutorial",
+        ]
+
+        title = ipw.HTML(
+            value="<h1>Welcome to the AiiDAlab demo server</h1>",
+        )
+
+        self.tabs = ipw.ToggleButtons(options=self.pages)
+
+        self.about = self._get_about_page()
+        self.apps = ipw.Output()
+        self.tutorial = self._get_tutorial_page()
+
+        self.content = ipw.VBox(children=[self.about])
+
+        super().__init__(
+            children=[
+                title,
+                self.tabs,
+                self.content,
+            ],
+            **kwargs,
+        )
+
+        self.add_class("demo-server-info")
+
+        self._set_event_listeners()
+
+    def _set_event_listeners(self):
+        """docstring"""
+        self.tabs.observe(self._on_tab_change)
+
+    def _on_tab_change(self, change: dict):
+        """docstring"""
+        label = change["new"]
+        if label in self.pages:
+            page = getattr(self, label.lower())
+            self.content.children = [page]
+
+    def _get_about_page(self) -> ipw.VBox:
+        """docstring"""
+        return self._get_page_from_content(
+            """
+            <h2>About the demo server</h2>
+            <p>
+                This is a demo server for AiiDAlab, a platform for computational science based on the AiiDA framework.
+            </p>
+            <p>
+                The server is running on a virtual machine with limited resources and is intended for demonstration purposes only.
+            </p>
+            <p>
+                The server is reset to its initial state every 24 hours.
+            </p>
+            <p>
+                For more information on AiiDAlab, please visit the <a href="https://www.aiidalab.net" target="_blank">AiiDAlab website</a>.
+            </p>
+            """
+        )
+
+    def _get_tutorial_page(self) -> ipw.VBox:
+        """docstring"""
+        return self._get_page_from_content(
+            """
+            <h2>A brief tutorial</h2>
+            <p>
+                A tutorial will be available here soon.
+            </p>
+            """
+        )
+
+    def _get_page_from_content(self, content: str) -> ipw.VBox:
+        """docstring"""
+        html = ipw.HTML(content)
+        page = ipw.VBox(children=[html])
+        page.add_class("demo-server-page")
+        return page
